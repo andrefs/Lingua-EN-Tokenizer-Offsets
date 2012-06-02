@@ -97,6 +97,7 @@ sub initial_offsets {
 		qr{(?<!\p{isAlpha})(['`])(?=\p{isAlpha})},
 		qr{(?<=\p{isAlpha})(['`])(?!\p{isAlpha})},
 		qr{(?:^|\s)(\S+)(?:$|\s)},
+		qr{(?:^|[^\.])(\.\.\.)(?:$|[^\.])},
 
 		qr{(?<=\p{isAlpha})['`]()(?=\p{isAlpha})},
 
@@ -116,10 +117,6 @@ sub initial_offsets {
 
 				if($s =~ /^$pat(?!$)/g){
    					my $first = $-[1];
-					dump($offsets->[$i]) unless defined($first);
-					say $pat unless defined($first);
-					dump($offsets->[$i]) unless $1;
-					die unless defined($first);
                     push @$split_points,[$start+$first,$start+$first];
 					my $second = $+[1];
                     push @$split_points,[$start+$second,$start+$second] if $first != $second;
@@ -144,7 +141,8 @@ sub initial_offsets {
 			}
 		}
 	}
-	return $offsets;
+	return _nonbp($text,$offsets);
+#return $offsets;
 }
 
 sub _split_tokens {
@@ -193,6 +191,47 @@ sub _load_prefixes {
 	}
 	close($prefix);
 }
+
+
+
+=method _nonbp
+
+=cut
+
+sub _nonbp {
+    my ($text,$offsets) = @_;
+	my $nonbpref = {};
+	_load_prefixes($nonbpref);
+    my $size = @$offsets;
+    my $new_offsets = [ sort { $a->[0] <=> $b->[0] } @$offsets ];
+	my $extra = [];
+    for(my $i=0; $i<$size-1; $i++){
+        my $start  = $new_offsets->[$i][0];
+        my $end    = $new_offsets->[$i][1];
+        my $length = $end-$start;
+        my $s = substr($text,$start,$length);
+        my $j=$i+1;
+		my $t = substr($text,$new_offsets->[$j][0], $new_offsets->[$j][1]-$new_offsets->[$j][0]);
+
+		if($s =~ /^(.*[^\s\.])\.\s*?$/){
+			my $pre = $1;
+			unless (
+					($nonbpref->{$pre} and $nonbpref->{$pre}==1)
+				or	($t =~ /^[\p{IsLower}]/)
+				or	(
+						$nonbpref->{$pre}
+					and	$nonbpref->{$pre}==2
+					and $t =~ /^\d+/)
+			){
+				$s =~ /^(.*[^\s\.])\.\s*?$/;
+				push @$extra, [$start+$+[1],$end];
+				$new_offsets->[$i][1] = $start+$+[1];
+			}
+		}
+	}
+	return [ sort { $a->[0] <=> $b->[0] } (@$new_offsets,@$extra) ];
+}
+			
 
 
 1;
