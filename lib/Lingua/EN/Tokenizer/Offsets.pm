@@ -3,10 +3,14 @@ use warnings;
 package Lingua::EN::Tokenizer::Offsets;
 use utf8::all;
 use Data::Dump qw/dump/;
+use feature qw/say/;
 
 use base 'Exporter';
 our @EXPORT_OK = qw/
-					tokenize
+					initial_offsets
+					token_offsets
+					adjust_offsets
+					get_tokens
 				/;
 
 
@@ -14,7 +18,70 @@ our @EXPORT_OK = qw/
 
 
 
-sub tokenize {
+
+=method get_offsets
+
+Takes text input and returns reference to array containin pairs of character
+offsets, corresponding to the tokens start and end positions.
+
+=cut
+
+sub token_offsets {
+    my ($text) = @_;
+    return [] unless defined $text;
+    my $offsets = initial_offsets($text);
+       $offsets = adjust_offsets($text,$offsets);
+    return $offsets;
+}
+
+
+=method get_tokens 
+
+Takes text input and splits it into tokens.
+
+=cut
+
+sub get_tokens {
+    my ($text)  = @_;
+    my $offsets = token_offsets($text);
+    my $tokens  = offsets2tokens($text,$offsets);
+    return $tokens;
+}
+
+
+
+=method adjust_offsets 
+
+Minor adjusts to offsets (leading/trailing whitespace, etc)
+
+=cut
+
+sub adjust_offsets {
+    my ($text,$offsets) = @_;
+    my $size = @$offsets;
+    for(my $i=0; $i<$size; $i++){
+        my $start  = $offsets->[$i][0];
+        my $end    = $offsets->[$i][1];
+        my $length = $end - $start;
+		if ($length <= 0){
+			delete $offsets->[$i];
+			next;
+		}
+        my $s = substr($text,$start,$length);
+        if ($s =~ /^\s*$/){
+            delete $offsets->[$i];
+            next;
+        }
+        $s =~ /^(\s*).*?(\s*)$/s;
+        if(defined($1)){ $start += length($1); }
+        if(defined($2)){ $end   -= length($2); }
+        $offsets->[$i] = [$start, $end];
+    }
+    my $new_offsets = [ grep { defined } @$offsets ];
+    return $new_offsets;
+}
+
+sub initial_offsets {
 	my ($text) = @_;
 	my $end;
 	my $text_end = length($text);
@@ -23,14 +90,16 @@ sub tokenize {
 	# token patterns
 	my @patterns = (
 		qr{([^\p{IsAlnum}\s\.\'\`\,\-])},
-		qr{(?<!\p{IsN})(),()(?!\d)},
-		qr{(?<=\p{IsN})(),()(?!\d)},
-		qr{(?<!\p{IsN})(),()(?=\d)},
-		qr{(?<!\p{isAlpha})()['`]()(?!\p{isAlpha})},
-		qr{(?<!\p{isAlpha})()['`]()(?=\p{isAlpha})},
-		qr{(?<=\p{isAlpha})()['`]()(?!\p{isAlpha})},
+		qr{(?<!\p{IsN})(,)(?!\d)},
+		qr{(?<=\p{IsN})(,)(?!\d)},
+		qr{(?<!\p{IsN})(,)(?=\d)},
+		qr{(?<!\p{isAlpha})(['`])(?!\p{isAlpha})},
+		qr{(?<!\p{isAlpha})(['`])(?=\p{isAlpha})},
+		qr{(?<=\p{isAlpha})(['`])(?!\p{isAlpha})},
+		qr{(?:^|\s)(\S+)(?:$|\s)},
 
 		qr{(?<=\p{isAlpha})['`]()(?=\p{isAlpha})},
+
 	);
 
 	my $split = 1;
@@ -44,18 +113,33 @@ sub tokenize {
 				my $s = substr($text,$start,$length);
 
 				my $split_points = [];
-				while($s =~ /(?<!^)$pat(?!$)/g){
-say STDERR "got one!";
-                    my $end   = $-[1];
-                    my $begin = $+[1];
-                    push @$split_points,[$start+$end,$start+$begin];
-					if ($-[2]){
-						my $end   = $-[2];
-                    	my $begin = $+[2];
-                    	push @$split_points,[$start+$end,$start+$begin];
-					}
+
+				if($s =~ /^$pat(?!$)/g){
+   					my $first = $-[1];
+					dump($offsets->[$i]) unless defined($first);
+					say $pat unless defined($first);
+					dump($offsets->[$i]) unless $1;
+					die unless defined($first);
+                    push @$split_points,[$start+$first,$start+$first];
+					my $second = $+[1];
+                    push @$split_points,[$start+$second,$start+$second] if $first != $second;
                 	$split = 1;
 				}
+				while($s =~ /(?<!^)$pat(?!$)/g){
+   					my $first = $-[1];
+                    push @$split_points,[$start+$first,$start+$first];
+					my $second = $+[1];
+                    push @$split_points,[$start+$second,$start+$second] if $first != $second;
+                	$split = 1;
+				}
+				if($s =~ /(?<!^)$pat$/g){
+					my $first = $-[1];
+                    push @$split_points,[$start+$first,$start+$first];
+					my $second = $+[1];
+                    push @$split_points,[$start+$second,$start+$second] if $first != $second;
+                	$split = 1;
+				}
+
 				_split_tokens($offsets,$i,[ sort { $a->[0] <=> $b->[0] } @$split_points ]) if @$split_points;
 			}
 		}
@@ -69,7 +153,7 @@ sub _split_tokens {
     my $last = $offsets->[$i][1];
     $offsets->[$i][1] = $end;
     while(my $p = shift @$split_points){
-        push @$offsets, [$start,$p->[0]];
+        push @$offsets, [$start,$p->[0]] unless $start == $p->[0];
         $start = $p->[1];
     }
     push @$offsets, [$start, $last];
@@ -91,6 +175,23 @@ sub offsets2tokens {
         push @$tokens, substr($text,$start,$length);
     }
     return $tokens;
+}
+
+
+sub _load_prefixes {
+	my ($prefixref) = @_;
+	$INC{'Lingua/EN/Tokenizer/Offsets.pm'} =~ m{\.pm$};
+	my $prefixfile = "$`/nonbreaking_prefix.en";
+	
+	open my $prefix, '<', $prefixfile or die "Could not open file '$prefixfile'!";
+	while (<$prefix>) {
+		next if /^#/ or /^\s*$/;
+		my $item = $_;
+		chomp($item);
+		if ($item =~ /(.*)[\s]+(\#NUMERIC_ONLY\#)/) { $prefixref->{$1} = 2; } 
+		else { $prefixref->{$item} = 1; }
+	}
+	close($prefix);
 }
 
 
