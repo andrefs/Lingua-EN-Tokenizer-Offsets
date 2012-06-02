@@ -97,7 +97,7 @@ sub initial_offsets {
 		qr{(?<!\p{isAlpha})(['`])(?=\p{isAlpha})},
 		qr{(?<=\p{isAlpha})(['`])(?!\p{isAlpha})},
 		qr{(?:^|\s)(\S+)(?:$|\s)},
-		qr{(?:^|[^\.])(\.\.\.)(?:$|[^\.])},
+		qr{(?:^|[^\.])(\.\.+)(?:$|[^\.])},
 
 		qr{(?<=\p{isAlpha})['`]()(?=\p{isAlpha})},
 
