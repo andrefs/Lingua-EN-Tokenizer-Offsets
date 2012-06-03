@@ -14,7 +14,7 @@ our @EXPORT_OK = qw/
 				/;
 
 
-# ABSTRACT: Doesn't matter what it does, it is awesome anyway! (TODO: change this -- ups!)
+# ABSTRACT: Finds word (token) boundaries, and returns their offsets.
 
 
 
@@ -202,8 +202,9 @@ sub _nonbp {
     my ($text,$offsets) = @_;
 	my $nonbpref = {};
 	_load_prefixes($nonbpref);
-    my $size = @$offsets;
-    my $new_offsets = [ sort { $a->[0] <=> $b->[0] } @$offsets ];
+	my $new_offsets = adjust_offsets($text,$offsets);
+    $new_offsets = [ sort { $a->[0] <=> $b->[0] } @$new_offsets ];
+    my $size = @$new_offsets;
 	my $extra = [];
     for(my $i=0; $i<$size-1; $i++){
         my $start  = $new_offsets->[$i][0];
@@ -213,10 +214,11 @@ sub _nonbp {
         my $j=$i+1;
 		my $t = substr($text,$new_offsets->[$j][0], $new_offsets->[$j][1]-$new_offsets->[$j][0]);
 
-		if($s =~ /^(.*[^\s\.])\.\s*?$/){
+		if($s =~ /^(\S+)\.\s?$/){
 			my $pre = $1;
 			unless (
-					($nonbpref->{$pre} and $nonbpref->{$pre}==1)
+					($pre =~ /\./ 		and $pre =~ /\p{IsAlpha}/)
+				or	($nonbpref->{$pre} 	and $nonbpref->{$pre}==1)
 				or	($t =~ /^[\p{IsLower}]/)
 				or	(
 						$nonbpref->{$pre}
