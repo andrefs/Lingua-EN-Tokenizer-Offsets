@@ -11,12 +11,25 @@ our @EXPORT_OK = qw/
 					token_offsets
 					adjust_offsets
 					get_tokens
+					tokenize
 				/;
 
 
 # ABSTRACT: Finds word (token) boundaries, and returns their offsets.
 
 
+
+=method tokenize($text)
+
+Takes text as input and returns a tokenized version (space-separated tokens).
+
+=cut
+
+sub tokenize {
+	my ($text) = @_;
+	my $tokens = get_tokens($text);
+	return join ' ',@$tokens;
+}
 
 
 =method get_offsets($text)
@@ -81,7 +94,7 @@ sub adjust_offsets {
     return $new_offsets;
 }
 
-=head2 initial_offsets($text)
+=method initial_offsets($text)
 
 First naive delimitation of tokens.
 
