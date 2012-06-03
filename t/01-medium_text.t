@@ -17,6 +17,7 @@ eq_or_diff "$got\n",  $expected,   "testing strings";
 
 sub load_strings {
 my $original = <<'END'
+I'm testing'this.
 Real-time PCR assays using TaqMan or Molecular
 Beacon probes were developed and optimized for the
 quantification of total bacteria, the nitrite-oxidizing bacteria
@@ -64,6 +65,11 @@ END
 ;
 
 my $expected = <<'END'
+I
+'m
+testing
+'this
+.
 Real-time
 PCR
 assays

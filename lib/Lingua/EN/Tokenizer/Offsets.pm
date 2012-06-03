@@ -19,7 +19,7 @@ our @EXPORT_OK = qw/
 
 
 
-=method get_offsets
+=method get_offsets($text)
 
 Takes text input and returns reference to array containin pairs of character
 offsets, corresponding to the tokens start and end positions.
@@ -35,7 +35,7 @@ sub token_offsets {
 }
 
 
-=method get_tokens 
+=method get_tokens($text)
 
 Takes text input and splits it into tokens.
 
@@ -50,7 +50,7 @@ sub get_tokens {
 
 
 
-=method adjust_offsets 
+=method adjust_offsets($text,$offsets)
 
 Minor adjusts to offsets (leading/trailing whitespace, etc)
 
@@ -81,6 +81,12 @@ sub adjust_offsets {
     return $new_offsets;
 }
 
+=head2 initial_offsets($text)
+
+First naive delimitation of tokens.
+
+=cut
+
 sub initial_offsets {
 	my ($text) = @_;
 	my $end;
@@ -89,13 +95,14 @@ sub initial_offsets {
 
 	# token patterns
 	my @patterns = (
-		qr{([^\p{IsAlnum}\s\.\'\`\,\-])},
+		qr{([^\p{IsAlnum}\s\.\'\`\,\-’])},
 		qr{(?<!\p{IsN})(,)(?!\d)},
 		qr{(?<=\p{IsN})(,)(?!\d)},
 		qr{(?<!\p{IsN})(,)(?=\d)},
-		qr{(?<!\p{isAlpha})(['`])(?!\p{isAlpha})},
-		qr{(?<!\p{isAlpha})(['`])(?=\p{isAlpha})},
-		qr{(?<=\p{isAlpha})(['`])(?!\p{isAlpha})},
+		qr{(?<!\p{isAlpha})(['`’])(?!\p{isAlpha})},
+		qr{(?<!\p{isAlpha})(['`’])(?=\p{isAlpha})},
+		qr{(?<=\p{isAlpha})(['`’])(?!\p{isAlpha})},
+		qr{(?<=\p{isAlpha})()['`’](?=\p{isAlpha})},
 		qr{(?:^|\s)(\S+)(?:$|\s)},
 		qr{(?:^|[^\.])(\.\.+)(?:$|[^\.])},
 
@@ -103,46 +110,38 @@ sub initial_offsets {
 
 	);
 
-	my $split = 1;
-	while ($split){
-		$split = 0;
-		for my $pat (@patterns){
-			my $size = @$offsets;
-        	for(my $i=0; $i<$size; $i++){
-				my $start  = $offsets->[$i][0];
-				my $length = $offsets->[$i][1]-$start;
-				my $s = substr($text,$start,$length);
+	for my $pat (@patterns){
+		my $size = @$offsets;
+    	for(my $i=0; $i<$size; $i++){
+			my $start  = $offsets->[$i][0];
+			my $length = $offsets->[$i][1]-$start;
+			my $s = substr($text,$start,$length);
 
-				my $split_points = [];
+			my $split_points = [];
 
-				if($s =~ /^$pat(?!$)/g){
-   					my $first = $-[1];
-                    push @$split_points,[$start+$first,$start+$first];
-					my $second = $+[1];
-                    push @$split_points,[$start+$second,$start+$second] if $first != $second;
-                	$split = 1;
-				}
-				while($s =~ /(?<!^)$pat(?!$)/g){
-   					my $first = $-[1];
-                    push @$split_points,[$start+$first,$start+$first];
-					my $second = $+[1];
-                    push @$split_points,[$start+$second,$start+$second] if $first != $second;
-                	$split = 1;
-				}
-				if($s =~ /(?<!^)$pat$/g){
-					my $first = $-[1];
-                    push @$split_points,[$start+$first,$start+$first];
-					my $second = $+[1];
-                    push @$split_points,[$start+$second,$start+$second] if $first != $second;
-                	$split = 1;
-				}
-
-				_split_tokens($offsets,$i,[ sort { $a->[0] <=> $b->[0] } @$split_points ]) if @$split_points;
+			if($s =~ /^$pat(?!$)/g){
+   				my $first = $-[1];
+                push @$split_points,[$start+$first,$start+$first];
+				my $second = $+[1];
+                push @$split_points,[$start+$second,$start+$second] if $first != $second;
 			}
+			while($s =~ /(?<!^)$pat(?!$)/g){
+   				my $first = $-[1];
+                push @$split_points,[$start+$first,$start+$first];
+				my $second = $+[1];
+                push @$split_points,[$start+$second,$start+$second] if $first != $second;
+			}
+			if($s =~ /(?<!^)$pat$/g){
+				my $first = $-[1];
+                push @$split_points,[$start+$first,$start+$first];
+				my $second = $+[1];
+                push @$split_points,[$start+$second,$start+$second] if $first != $second;
+			}
+
+			_split_tokens($offsets,$i,[ sort { $a->[0] <=> $b->[0] } @$split_points ]) if @$split_points;
 		}
 	}
 	return _nonbp($text,$offsets);
-#return $offsets;
 }
 
 sub _split_tokens {
@@ -158,7 +157,7 @@ sub _split_tokens {
 }
 
 
-=method offsets2tokens
+=method offsets2tokens($text,$offsets)
 
 Given a list of token boundaries offsets and a text, returns an array with the text split into tokens.
 
@@ -191,12 +190,6 @@ sub _load_prefixes {
 	}
 	close($prefix);
 }
-
-
-
-=method _nonbp
-
-=cut
 
 sub _nonbp {
     my ($text,$offsets) = @_;
@@ -234,6 +227,42 @@ sub _nonbp {
 	return [ sort { $a->[0] <=> $b->[0] } (@$new_offsets,@$extra) ];
 }
 			
-
-
 1;
+
+__END__
+
+
+=head1 SYNOPSIS
+
+
+    use Lingua::EN::Tokenizer::Offsets qw/token_offsets get_tokens/;
+     
+    my $str <<END
+    Hey! Mr. Tambourine Man, play a song for me.
+    I'm not sleepy and there is no place I’m going to.
+    END
+
+    my $offsets = token_offsets($str);     ## Get the offsets.
+    foreach my $o (@$offsets) {
+        my $start  = $o->[0];
+        my $length = $o->[1]-$o->[0];
+
+        my $token = substr($text,$start,$length)  ## Get a token.
+        # ...
+    }
+
+    ### or
+
+    my $tokens = get_tokens($str);     
+    foreach my $token (@$tokens) {
+        ## do something with $token
+    }
+
+=head1 ACKNOWLEDGEMENTS
+
+Based on the original tokenizer written by Josh Schroeder and provided by Europarl L<http://www.statmt.org/europarl/>.
+
+=head1 SEE ALSO
+
+L<Lingua::EN::Sentence::Offsets>, L<Lingua::FreeLing3::Tokenizer>
+
