@@ -17,11 +17,11 @@ our @EXPORT_OK = qw/
 
 # ABSTRACT: Finds word (token) boundaries, and returns their offsets.
 
-
-
 =method tokenize($text)
 
-Takes text as input and returns a tokenized version (space-separated tokens).
+Returns a tokenized version of $text (space-separated tokens).
+
+$text can be a scalar or a scalar reference.
 
 =cut
 
@@ -34,8 +34,11 @@ sub tokenize {
 
 =method get_offsets($text)
 
-Takes text input and returns reference to array containin pairs of character
-offsets, corresponding to the tokens start and end positions.
+Returns a reference to an array containin pairs of character
+offsets, corresponding to the start and end positions of tokens
+from $text.
+
+$text can be a scalar or a scalar reference.
 
 =cut
 
@@ -50,7 +53,9 @@ sub token_offsets {
 
 =method get_tokens($text)
 
-Takes text input and splits it into tokens.
+Splits $text it into tokens, returning an array reference.
+
+$text can be a scalar or a scalar reference.
 
 =cut
 
@@ -67,10 +72,13 @@ sub get_tokens {
 
 Minor adjusts to offsets (leading/trailing whitespace, etc)
 
+$text can be a scalar or a scalar reference.
+
 =cut
 
 sub adjust_offsets {
     my ($text,$offsets) = @_;
+	$text = $$text if ref($text);
     my $size = @$offsets;
     for(my $i=0; $i<$size; $i++){
         my $start  = $offsets->[$i][0];
@@ -98,10 +106,13 @@ sub adjust_offsets {
 
 First naive delimitation of tokens.
 
+$text can be a scalar or a scalar reference.
+
 =cut
 
 sub initial_offsets {
 	my ($text) = @_;
+	$text = $$text if ref($text);
 	my $end;
 	my $text_end = length($text);
 	my $offsets = [[0,$text_end]];
@@ -174,10 +185,13 @@ sub _split_tokens {
 
 Given a list of token boundaries offsets and a text, returns an array with the text split into tokens.
 
+$text can be a scalar or a scalar reference.
+
 =cut
 
 sub offsets2tokens {
     my ($text, $offsets) = @_;
+	$text = $$text if ref($text);
     my $tokens = [];
     foreach my $o ( sort {$a->[0] <=> $b->[0]} @$offsets) {
         my $start = $o->[0];
@@ -206,6 +220,7 @@ sub _load_prefixes {
 
 sub _nonbp {
     my ($text,$offsets) = @_;
+	$text = $$text if ref($text);
 	my $nonbpref = {};
 	_load_prefixes($nonbpref);
 	my $new_offsets = adjust_offsets($text,$offsets);

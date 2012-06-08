@@ -9,7 +9,7 @@ use utf8::all;
 
 
 my ($original,$expected) = &load_strings;
-my $tokens = get_tokens($original);
+my $tokens = get_tokens(\$original);
 my $got = join "\n",@$tokens;
 
 eq_or_diff "$got\n",  $expected,   "testing strings";
