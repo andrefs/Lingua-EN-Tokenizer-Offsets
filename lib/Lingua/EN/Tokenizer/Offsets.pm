@@ -12,6 +12,7 @@ our @EXPORT_OK = qw/
 					adjust_offsets
 					get_tokens
 					tokenize
+					offsets2tokens
 				/;
 
 
