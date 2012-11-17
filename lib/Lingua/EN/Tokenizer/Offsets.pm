@@ -248,6 +248,7 @@ sub _nonbp {
 					and $t =~ /^\d+/)
 			){
 				$s =~ /^(.*[^\s\.])\.\s*?$/;
+				next unless defined($+[1]);
 				push @$extra, [$start+$+[1],$end];
 				$new_offsets->[$i][1] = $start+$+[1];
 			}
